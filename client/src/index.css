@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Outfit', sans-serif;
+  
+  /* Swiss Modernist & Vermillion Theme Palette */
+  --color-brand-red: #e53b2c;
+  --color-brand-cream: #f4f3ef;
+  --color-brand-charcoal: #151515;
+  --color-brand-white: #ffffff;
+  --color-brand-gray: #e6e4dc;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background-color: #f4f3ef;
+  color: #151515;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Swiss Modernist Panel Style helpers */
+.swiss-border {
+  border: 1.5px solid #e53b2c;
+}
+
+.swiss-border-dark {
+  border: 1.5px solid #151515;
+}
+
+/* Flat hard drop shadow (Neo-brutalist style) */
+.swiss-shadow {
+  box-shadow: 4px 4px 0px 0px #151515;
+}
+
+.swiss-shadow-red {
+  box-shadow: 4px 4px 0px 0px #e53b2c;
+}
+
+/* Modern Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f4f3ef;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e53b2c;
+  border: 2px solid #f4f3ef;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #151515;
+}
