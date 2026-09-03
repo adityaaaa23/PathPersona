@@ -1,4 +1,18 @@
-const Groq = require('groq-sdk');
+const Groq = require("groq-sdk");
+const MODEL = "qwen/qwen3.6-27b";
+
+function parseJsonArray(text) {
+  const withoutThinking = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  const clean = withoutThinking.replace(/```json|```/gi, "").trim();
+  const start = clean.indexOf("[");
+  const end = clean.lastIndexOf("]");
+
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error("Groq did not return a JSON array");
+  }
+
+  return JSON.parse(clean.slice(start, end + 1));
+}
 
 // Initialize Groq with API key from .env
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -8,7 +22,7 @@ const personalityDescriptions = {
   VISUAL: "learns best through videos, diagrams, and visual content",
   READER: "learns best through documentation, articles, and books",
   KINESTHETIC: "learns best through hands-on projects and building things",
-  SOCIAL: "learns best through community, pair programming, and mentorship"
+  SOCIAL: "learns best through community, pair programming, and mentorship",
 };
 
 async function generateRoadmap(personalityType, skill) {
@@ -44,31 +58,29 @@ async function generateRoadmap(personalityType, skill) {
 
     // Send the prompt to Groq
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile", // free and powerful model
+      model: MODEL,
       messages: [
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
-      max_tokens: 8192,
+      max_tokens: 7000,
     });
 
     const text = response.choices[0].message.content;
-    const clean = text.replace(/```json|```/g, "").trim();
-    const roadmap = JSON.parse(clean);
+    const roadmap = parseJsonArray(text);
 
     // revise it later
-    const structuredRoadmap = roadmap.map(day => ({
+    const structuredRoadmap = roadmap.map((day) => ({
       ...day,
-      subtasks: day.subtasks.map(task => ({
+      subtasks: day.subtasks.map((task) => ({
         task: task,
-        completed: false
-      }))
+        completed: false,
+      })),
     }));
 
     return structuredRoadmap;
-
   } catch (err) {
     throw new Error("Failed to generate roadmap: " + err.message);
   }
@@ -76,7 +88,6 @@ async function generateRoadmap(personalityType, skill) {
 
 async function recommendedRoadmap(personalityType, skill) {
   try {
-
     // Build a smart prompt tailored to the user's learning style
     const prompt = `
       A user with ${personalityType} learning style has just completed learning ${skill}.
@@ -93,23 +104,21 @@ async function recommendedRoadmap(personalityType, skill) {
 
     // Send the prompt to Groq
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile", // free and powerful model
+      model: MODEL,
       messages: [
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       max_tokens: 1024,
     });
 
     // Extract the text from Groq's response
     const text = response.choices[0].message.content;
-    const clean = text.replace(/```json|```/g, "").trim();
-    const recommendations = JSON.parse(clean);
+    const recommendations = parseJsonArray(text);
 
     return recommendations;
-
   } catch (err) {
     throw new Error("Failed to generate roadmap: " + err.message);
   }
@@ -150,51 +159,52 @@ async function roadmapQuiz(skill, completedTopics) {
 
     // Send the prompt to Groq
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile", // free and powerful model
+      model: MODEL,
       messages: [
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       max_tokens: 4096,
     });
 
     const text = response.choices[0].message.content;
-    const clean = text.replace(/```json|```/g, "").trim();
-    const quiz = JSON.parse(clean);
+    const quiz = parseJsonArray(text);
 
     return quiz;
   } catch (err) {
     throw new Error("Failed to generate quiz:", err.message);
   }
-
 }
 
 async function quote() {
   try {
-    const prompt = `Give me a random quote for motivating me for keep going in life and doing the best i can keep it short precise and impactfull.
-`;
+    const prompt = `Return one original motivational quote. Return only the quote, under 12 words, with no reasoning, explanation, or quotation marks.`;
 
     // Send the prompt to Groq
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile", // free and powerful model
+      model: MODEL,
       messages: [
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
-      max_tokens: 1024,
+      max_tokens: 128,
     });
 
-    const text = response.choices[0].message.content;
+    const text = response.choices[0]?.message?.content || "";
+    const answer = text.includes("</think>")
+      ? text.slice(text.lastIndexOf("</think>") + 8).trim()
+      : text.replace(/<think>[\s\S]*$/i, "").trim();
 
-    return text;
+    return (
+      answer.replace(/^['"]|['"]$/g, "").trim() || "Progress, not perfection."
+    );
   } catch (err) {
-    throw new Error("Failed to generate quiz:", err.message);
+    throw new Error("Failed to generate quote: " + err.message);
   }
-
 }
 
 module.exports = { generateRoadmap, recommendedRoadmap, roadmapQuiz, quote };

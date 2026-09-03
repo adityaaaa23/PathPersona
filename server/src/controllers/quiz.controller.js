@@ -38,7 +38,6 @@ async function submitQuiz(req, res) {
   try {
     const { answers } = req.body;
     const userId = req.user.id;
-
     if (answers.length !== questions.length) {
       return res.status(400).json({
         message: "Please answer all the questions",

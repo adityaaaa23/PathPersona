@@ -1,11 +1,11 @@
-const roadmapModel = require('../models/roadmap.model');
-const userModel = require('../models/user.model');
-const {quote : quoteAi} =require('../services/groq.service');
+const roadmapModel = require("../models/roadmap.model");
+const userModel = require("../models/user.model");
+const { quote: quoteAi } = require("../services/groq.service");
 
 async function profile(req, res) {
   try {
     const userId = req.user.id;
-    const user = await userModel.findById(userId).select('-password');
+    const user = await userModel.findById(userId).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "User doesn't exist" });
@@ -13,11 +13,10 @@ async function profile(req, res) {
 
     res.status(200).json({
       message: "User fetched successfully",
-      user
-    })
-
+      user,
+    });
   } catch (err) {
-    return res.status(500).json({ message: "Internal server error", err })
+    return res.status(500).json({ message: "Internal server error", err });
   }
 }
 
@@ -26,12 +25,27 @@ async function dashboard(req, res) {
     const userId = req.user.id;
     const user = await userModel.findById(userId).select("-password");
     const roadmaps = await roadmapModel.find({ userId });
-    const numberOfRoadmapsGenerated=roadmaps.length;
-    let numberOfRoadmapsFinished=roadmaps.filter((r)=>r.completed===true).length;
-    const quote=await quoteAi();
-    return res.status(200).json({message:"User details fetched successfully",user,stats:{numberOfRoadmapsGenerated,numberOfRoadmapsFinished},quote,roadmaps});
+    const numberOfRoadmapsGenerated = roadmaps.length;
+    let numberOfRoadmapsFinished = roadmaps.filter(
+      (r) => r.completed === true,
+    ).length;
+    let quote = "";
+    try {
+      quote = await quoteAi();
+    } catch (err) {
+      console.error("Failed to fetch dashboard quote", err.message);
+    }
+    return res
+      .status(200)
+      .json({
+        message: "User details fetched successfully",
+        user,
+        stats: { numberOfRoadmapsGenerated, numberOfRoadmapsFinished },
+        quote,
+        roadmaps,
+      });
   } catch (err) {
-    return res.status(500).json({ message: "Server Error" })
+    return res.status(500).json({ message: "Server Error" });
   }
 }
 

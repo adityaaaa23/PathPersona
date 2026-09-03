@@ -1,13 +1,30 @@
-const roadmapModel = require('../models/roadmap.model');
-const userModel = require('../models/user.model')
-const { generateRoadmap: generateRoadmapAI, recommendedRoadmap, roadmapQuiz } = require('../services/groq.service');
+const roadmapModel = require("../models/roadmap.model");
+const userModel = require("../models/user.model");
+const {
+  generateRoadmap: generateRoadmapAI,
+  recommendedRoadmap,
+  roadmapQuiz,
+} = require("../services/groq.service");
 
 async function generateRoadmap(req, res) {
   try {
     const userId = req.user.id;
     const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User does not exist" });
+    }
     const personalityType = user.personalityType;
-    const { skill } = req.body;
+    const skill = req.body.skill?.trim();
+    if (!personalityType) {
+      return res
+        .status(400)
+        .json({
+          message: "Complete the personality quiz before generating a roadmap",
+        });
+    }
+    if (!skill) {
+      return res.status(400).json({ message: "Skill is required" });
+    }
     const roadmap = await generateRoadmapAI(personalityType, skill);
 
     const newRoadmap = await roadmapModel.create({
@@ -16,14 +33,13 @@ async function generateRoadmap(req, res) {
       personalityType,
       roadmap,
       completed: false,
-    })
+    });
 
     res.status(201).json({ message: "New roadmap created", newRoadmap });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Server error", err });
   }
-
 }
 
 async function viewRoadmaps(req, res) {
@@ -37,23 +53,24 @@ async function viewRoadmaps(req, res) {
 }
 
 async function getRoadmap(req, res) {
-
   try {
     const roadmapId = req.params.id;
     const userId = req.user.id;
     const roadmap = await roadmapModel.findOne({ _id: roadmapId, userId });
 
     if (!roadmap) {
-      return res.status(404).json({ message: "The given roadmap doesn't exist" });
+      return res
+        .status(404)
+        .json({ message: "The given roadmap doesn't exist" });
     }
 
     res.status(200).json({
       message: "Roadmap fetched successfully",
       roadmap,
-    })
+    });
   } catch (err) {
     console.log(err);
-    return res.status(500).json({ message: "Server error", err })
+    return res.status(500).json({ message: "Server error", err });
   }
 }
 
@@ -61,16 +78,21 @@ async function deleteRoadmap(req, res) {
   try {
     const roadmapId = req.params.id;
     const userId = req.user.id;
-    const roadmap = await roadmapModel.findOneAndDelete({ _id: roadmapId, userId });
+    const roadmap = await roadmapModel.findOneAndDelete({
+      _id: roadmapId,
+      userId,
+    });
 
     if (!roadmap) {
-      return res.status(404).json({ message: "The given roadmap doesn't exist" });
+      return res
+        .status(404)
+        .json({ message: "The given roadmap doesn't exist" });
     }
 
     return res.status(200).json({
       message: "The roadmap is deleted successfully",
       roadmap,
-    })
+    });
   } catch (err) {
     return res.status(500).json({ message: "Server Error", err });
   }
@@ -82,21 +104,29 @@ async function markRoadmapComplete(req, res) {
     const roadmapId = req.params.id;
     let roadmap = await roadmapModel.findOne({ _id: roadmapId, userId });
     if (!roadmap) {
-      return res.status(404).json({ message: "Roadmap does not exist" })
+      return res.status(404).json({ message: "Roadmap does not exist" });
     }
     const allDaysCompleted = roadmap.roadmap.every(
-      (day) => day.completed === true
+      (day) => day.completed === true,
     );
     if (allDaysCompleted) {
-      roadmap = await roadmapModel.findOneAndUpdate({ _id: roadmapId, userId }, { $set: { completed: true, completedAt: Date.now() } }, { returnDocument: 'after' });
+      roadmap = await roadmapModel.findOneAndUpdate(
+        { _id: roadmapId, userId },
+        { $set: { completed: true, completedAt: Date.now() } },
+        { returnDocument: "after" },
+      );
+    } else {
+      return res
+        .status(400)
+        .json({
+          message: "Finish all the daily tasks in order to mark it completed",
+        });
     }
-    else {
-      return res.status(400).json({ message: "Finish all the daily tasks in order to mark it completed" });
-    }
-    return res.status(200).json({ message: "This roadmap is completed by the user", roadmap })
-
+    return res
+      .status(200)
+      .json({ message: "This roadmap is completed by the user", roadmap });
   } catch (err) {
-    return res.status(500).json({ message: "Server Error", err })
+    return res.status(500).json({ message: "Server Error", err });
   }
 }
 
@@ -106,13 +136,24 @@ async function viewRecommendations(req, res) {
     const userId = req.user.id;
     const user = await userModel.findById(userId);
     const personalityType = user.personalityType;
-    const completedRoadmaps = await roadmapModel.find({ userId, completed: true });
+    const completedRoadmaps = await roadmapModel.find({
+      userId,
+      completed: true,
+    });
     if (completedRoadmaps.length === 0) {
-      return res.status(404).json({ message: "No completed roadmaps yet" })
+      return res.status(404).json({ message: "No completed roadmaps yet" });
     }
-    const completedSkills = completedRoadmaps.map(r => r.skill).join(",");
-    const recommendations = await recommendedRoadmap(personalityType, completedSkills);
-    return res.status(201).json({ message: "Recommendations fetched successfully", recommendations });
+    const completedSkills = completedRoadmaps.map((r) => r.skill).join(",");
+    const recommendations = await recommendedRoadmap(
+      personalityType,
+      completedSkills,
+    );
+    return res
+      .status(201)
+      .json({
+        message: "Recommendations fetched successfully",
+        recommendations,
+      });
   } catch (err) {
     return res.status(500).json({ message: "Server Error", err });
   }
@@ -131,8 +172,10 @@ async function generateRecommendedRoadmap(req, res) {
       personalityType,
       roadmap,
       completed: false,
-    })
-    return res.status(201).json({ message: "New roadmap generated", newRoadmap });
+    });
+    return res
+      .status(201)
+      .json({ message: "New roadmap generated", newRoadmap });
   } catch (err) {
     return res.status(500).json({ message: "Server Error", err });
   }
@@ -149,9 +192,9 @@ async function completedTask(req, res) {
       {
         $set: {
           [`roadmap.${dayIndex}.subtasks.${subtaskIndex}.completed`]: completed,
-        }
+        },
       },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
     if (!roadmap) {
@@ -160,7 +203,7 @@ async function completedTask(req, res) {
 
     // Check if all subtasks in that day are completed
     const allSubtasksCompleted = roadmap.roadmap[dayIndex].subtasks.every(
-      (subtask) => subtask.completed === true
+      (subtask) => subtask.completed === true,
     );
 
     if (allSubtasksCompleted) {
@@ -168,38 +211,46 @@ async function completedTask(req, res) {
         { _id: roadmapId, userId },
         {
           $set: {
-            [`roadmap.${dayIndex}.completed`]: true
-          }
+            [`roadmap.${dayIndex}.completed`]: true,
+          },
         },
-        { returnDocument: "after" }
+        { returnDocument: "after" },
       );
       const today = new Date();
       const yesterday = new Date();
       yesterday.setDate(today.getDate() - 1);
       const lastActivityDate = new Date(user.lastActivityDate);
-      const isYesterday = (lastActivityDate.getDate() === yesterday.getDate() && (lastActivityDate.getMonth() === yesterday.getMonth() && lastActivityDate.getFullYear() === yesterday.getFullYear()));
-      const isToday = (lastActivityDate.getDate() === today.getDate() && (lastActivityDate.getMonth() === today.getMonth() && lastActivityDate.getFullYear() === today.getFullYear()));
+      const isYesterday =
+        lastActivityDate.getDate() === yesterday.getDate() &&
+        lastActivityDate.getMonth() === yesterday.getMonth() &&
+        lastActivityDate.getFullYear() === yesterday.getFullYear();
+      const isToday =
+        lastActivityDate.getDate() === today.getDate() &&
+        lastActivityDate.getMonth() === today.getMonth() &&
+        lastActivityDate.getFullYear() === today.getFullYear();
       if (isToday) {
         // nothing because today is the lastActivityDate
-      }
-      else if (isYesterday) {
+      } else if (isYesterday) {
         user.currentStreak++;
         user.longestStreak = Math.max(user.currentStreak, user.longestStreak);
         user.lastActivityDate = Date.now();
         await user.save();
-      }
-      else {
+      } else {
         user.currentStreak = 1;
         user.lastActivityDate = today;
         await user.save();
       }
     }
     const allDaysCompleted = roadmap.roadmap.every(
-      (day) => day.completed === true
+      (day) => day.completed === true,
     );
 
     if (allDaysCompleted) {
-      roadmap = await roadmapModel.findOneAndUpdate({ _id: roadmapId, userId }, { $set: { completed: true, completedAt: Date.now() } }, { returnDocument: 'after' });
+      roadmap = await roadmapModel.findOneAndUpdate(
+        { _id: roadmapId, userId },
+        { $set: { completed: true, completedAt: Date.now() } },
+        { returnDocument: "after" },
+      );
     }
 
     return res.status(200).json({ message: "Task marked completed", roadmap });
@@ -217,10 +268,14 @@ async function quizOnRoadmap(req, res) {
       return res.status(400).json({ message: "Roadmap does not exist" });
     }
     const { skill } = roadmap;
-    const completedDays = roadmap.roadmap.filter(day => day.completed === true);
-    let completedTopics = completedDays.map((day) => (day.topic));
+    const completedDays = roadmap.roadmap.filter(
+      (day) => day.completed === true,
+    );
+    let completedTopics = completedDays.map((day) => day.topic);
     const quiz = await roadmapQuiz(skill, completedTopics);
-    return res.status(200).json({ message: "Quiz generated successfully", quiz });
+    return res
+      .status(200)
+      .json({ message: "Quiz generated successfully", quiz });
   } catch (err) {
     return res.status(500).json({ message: "Server Error", err });
   }
@@ -237,7 +292,9 @@ async function submitRoadmapQuiz(req, res) {
     const { answers } = req.body;
     const { questions } = req.body;
 
-    let score = answers.filter((ans, index) => ans === questions[index].answer).length;
+    let score = answers.filter(
+      (ans, index) => ans === questions[index].answer,
+    ).length;
     const percentage = Math.round((score / questions.length) * 100);
 
     roadmap.quizHistory.push({
@@ -245,14 +302,27 @@ async function submitRoadmapQuiz(req, res) {
       totalQuestions: questions.length,
       score,
       percentage,
-    })
+    });
 
     await roadmap.save();
 
-    return res.status(201).json({ message: "Quiz attempted successfully", roadmap });
+    return res
+      .status(201)
+      .json({ message: "Quiz attempted successfully", roadmap });
   } catch (err) {
-    return res.status(500).json({ message: "Server Error", err })
+    return res.status(500).json({ message: "Server Error", err });
   }
 }
 
-module.exports = { generateRoadmap, viewRoadmaps, getRoadmap, deleteRoadmap, markRoadmapComplete, viewRecommendations, generateRecommendedRoadmap, completedTask, quizOnRoadmap, submitRoadmapQuiz };
+module.exports = {
+  generateRoadmap,
+  viewRoadmaps,
+  getRoadmap,
+  deleteRoadmap,
+  markRoadmapComplete,
+  viewRecommendations,
+  generateRecommendedRoadmap,
+  completedTask,
+  quizOnRoadmap,
+  submitRoadmapQuiz,
+};
